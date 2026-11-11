@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,9 +14,14 @@ class PocketMoneyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      title: '얼마남았지?',
       debugShowCheckedModeBanner: false,
-      home: MoneyTrackerPage(),
+      theme: ThemeData(
+        primarySwatch: Colors.teal,
+        useMaterial3: true,
+      ),
+      home: const MoneyTrackerPage(),
     );
   }
 }
@@ -27,35 +34,60 @@ class MoneyTrackerPage extends StatefulWidget {
 }
 
 class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
-  // 현재 선택된 연/월
   DateTime currentMonth = DateTime.now();
-
-  // 월별 받은 총 용돈 저장소 (예: {'2026-11': 300000})
-  final Map<String, int> monthlyBudgets = {};
+  Map<String, int> monthlyBudgets = {};
+  List> history = [];
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
   final TextEditingController memoController = TextEditingController();
-  final history = [];
 
   @override
   void initState() {
     super.initState();
+    loadSavedData();
+  }
+
+  // 1. 스마트폰 내부 저장소에서 데이터 불러오기
+  Future<void> loadSavedData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedBudgets = prefs.getString('saved_budgets');
+    if (savedBudgets != null) {
+      try {
+        final decoded = jsonDecode(savedBudgets) as Map<String, dynamic>;
+        monthlyBudgets = decoded.map((k, v) => MapEntry(k, v as int));
+      } catch (_) {}
+    }
+
+    final savedHistory = prefs.getString('saved_history');
+    if (savedHistory != null) {
+      try {
+        final decoded = jsonDecode(savedHistory) as List<dynamic>;
+        history = decoded.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+      } catch (_) {}
+    }
+
+    setState(() {});
     updateAppWidget();
   }
 
-  // 현재 보고 있는 연-월 키값 (예: '2026-11')
+  // 2. 스마트폰 내부 저장소에 데이터 영구 저장하기
+  Future<void> persistData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('saved_budgets', jsonEncode(monthlyBudgets));
+    await prefs.setString('saved_history', jsonEncode(history));
+    updateAppWidget();
+  }
+
   String get currentMonthKey =>
       '${currentMonth.year}-${currentMonth.month.toString().padLeft(2, '0')}';
 
-  // 현재 보고 있는 달의 받은 용돈 (설정 안했으면 기본 30만원)
   int get currentBudget => monthlyBudgets[currentMonthKey] ?? 300000;
 
-  // 현재 보고 있는 달의 지출 내역만 필터링
-  List get currentHistory =>
+  List> get currentHistory =>
       history.where((item) => item['yearMonth'] == currentMonthKey).toList();
 
-  // 현재 보고 있는 달의 총 쓴 돈
   int get currentSpent {
     int sum = 0;
     for (var item in currentHistory) {
@@ -64,7 +96,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     return sum;
   }
 
-  // 현재 보고 있는 달의 남은 용돈
   int get currentRemaining => currentBudget - currentSpent;
 
   String formatCurrency(int amount) {
@@ -74,7 +105,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         );
   }
 
-  // 바탕화면 위젯 갱신
   void updateAppWidget() {
     HomeWidget.saveWidgetData<String>('balance_text', '${formatCurrency(currentRemaining)}원');
     HomeWidget.updateWidget(
@@ -83,7 +113,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     );
   }
 
-  // 이전 달로 이동
   void prevMonth() {
     setState(() {
       currentMonth = DateTime(currentMonth.year, currentMonth.month - 1, 1);
@@ -91,7 +120,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     updateAppWidget();
   }
 
-  // 다음 달로 이동
   void nextMonth() {
     setState(() {
       currentMonth = DateTime(currentMonth.year, currentMonth.month + 1, 1);
@@ -99,7 +127,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     updateAppWidget();
   }
 
-  // 해당 월 용돈 예산 설정 다이얼로그
   void showSetBalanceDialog() {
     final setBudgetController = TextEditingController(text: currentBudget.toString());
 
@@ -128,7 +155,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                   setState(() {
                     monthlyBudgets[currentMonthKey] = newBudget;
                   });
-                  updateAppWidget();
+                  persistData();
                   Navigator.pop(context);
                 }
               },
@@ -144,7 +171,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     );
   }
 
-  // 지출 추가
   void addExpense() {
     final String title = titleController.text.trim();
     final int? amount = int.tryParse(amountController.text.trim());
@@ -165,27 +191,25 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         'amount': amount,
         'time': timeStr,
         'memo': memo,
-        'yearMonth': currentMonthKey, // 현재 선택된 달에 귀속
+        'yearMonth': currentMonthKey,
       });
     });
 
-    updateAppWidget();
+    persistData();
     titleController.clear();
     amountController.clear();
     memoController.clear();
     FocusScope.of(context).unfocus();
   }
 
-  // 지출 삭제
-  void deleteExpense(Map item) {
+  void deleteExpense(Map<String, dynamic> item) {
     setState(() {
       history.remove(item);
     });
-    updateAppWidget();
+    persistData();
   }
 
-  // 지출 내역 수정
-  void showEditDialog(Map item) {
+  void showEditDialog(Map<String, dynamic> item) {
     final editTitle = TextEditingController(text: item['title']);
     final editAmount = TextEditingController(text: item['amount'].toString());
     final editMemo = TextEditingController(text: item['memo'] ?? '');
@@ -232,7 +256,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                     item['amount'] = newAmount;
                     item['memo'] = newMemo;
                   });
-                  updateAppWidget();
+                  persistData();
                   Navigator.pop(context);
                 }
               },
@@ -256,7 +280,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('초간단 용돈기록장'),
+        title: const Text('얼마남았지?'),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
       ),
@@ -264,7 +288,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Column(
           children: [
-            // [월 선택 네비게이션 헤더]
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -284,8 +307,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                 ),
               ],
             ),
-
-            // [대시보드 카드]
             Card(
               color: Colors.teal.shade50,
               elevation: 0,
@@ -379,8 +400,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // [입력창 1줄: 사용내역, 금액]
             Row(
               children: [
                 Expanded(
@@ -410,8 +429,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 8),
-
-            // [입력창 2줄: 메모, 지출 버튼]
             Row(
               children: [
                 Expanded(
@@ -437,8 +454,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 12),
-
-            // [지출 내역 목록 헤더]
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -447,8 +462,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 6),
-
-            // [지출 목록 리스트]
             Expanded(
               child: filteredList.isEmpty
                   ? Center(
