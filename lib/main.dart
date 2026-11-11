@@ -35,8 +35,8 @@ class MoneyTrackerPage extends StatefulWidget {
 
 class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
   DateTime currentMonth = DateTime.now();
-  Map<String, int> monthlyBudgets = {};
-  List> history = [];
+  final Map<String, int> monthlyBudgets = {};
+  final history = [];
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
@@ -55,16 +55,22 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     final savedBudgets = prefs.getString('saved_budgets');
     if (savedBudgets != null) {
       try {
-        final decoded = jsonDecode(savedBudgets) as Map<String, dynamic>;
-        monthlyBudgets = decoded.map((k, v) => MapEntry(k, v as int));
+        final decoded = jsonDecode(savedBudgets) as Map;
+        monthlyBudgets.clear();
+        decoded.forEach((k, v) {
+          monthlyBudgets[k.toString()] = v as int;
+        });
       } catch (_) {}
     }
 
     final savedHistory = prefs.getString('saved_history');
     if (savedHistory != null) {
       try {
-        final decoded = jsonDecode(savedHistory) as List<dynamic>;
-        history = decoded.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+        final decoded = jsonDecode(savedHistory);
+        if (decoded is List) {
+          history.clear();
+          history.addAll(decoded);
+        }
       } catch (_) {}
     }
 
@@ -85,7 +91,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
 
   int get currentBudget => monthlyBudgets[currentMonthKey] ?? 300000;
 
-  List> get currentHistory =>
+  List get currentHistory =>
       history.where((item) => item['yearMonth'] == currentMonthKey).toList();
 
   int get currentSpent {
@@ -202,14 +208,14 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     FocusScope.of(context).unfocus();
   }
 
-  void deleteExpense(Map<String, dynamic> item) {
+  void deleteExpense(Map item) {
     setState(() {
       history.remove(item);
     });
     persistData();
   }
 
-  void showEditDialog(Map<String, dynamic> item) {
+  void showEditDialog(Map item) {
     final editTitle = TextEditingController(text: item['title']);
     final editAmount = TextEditingController(text: item['amount'].toString());
     final editMemo = TextEditingController(text: item['memo'] ?? '');
@@ -288,6 +294,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Column(
           children: [
+            // 월 이동 헤더
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -307,6 +314,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                 ),
               ],
             ),
+
+            // 상단 대시보드 카드
             Card(
               color: Colors.teal.shade50,
               elevation: 0,
@@ -400,6 +409,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 10),
+
+            // 사용내역 & 금액 입력창
             Row(
               children: [
                 Expanded(
@@ -429,6 +440,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 8),
+
+            // 메모 & 등록 버튼
             Row(
               children: [
                 Expanded(
@@ -454,6 +467,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 12),
+
+            // 월별 내역 리스트 헤더
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -462,6 +477,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 6),
+
+            // 지출 리스트
             Expanded(
               child: filteredList.isEmpty
                   ? Center(
