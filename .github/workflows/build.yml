@@ -20,17 +20,34 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: 깨끗한 안드로이드 프로젝트 뼈대 생성
+      - name: 안드로이드 프로젝트 뼈대 및 위젯 보호 결합
         run: |
-          # 1. 새 플러터 프로젝트를 만들어 순정 안드로이드 폴더 추출
-          flutter create --org com.pocket.money --project-name pocket_money_app fresh_app
-          cp -r fresh_app/android ./
-          rm -rf fresh_app
+          # 1. 임시 프로젝트에서 필요한 Gradle 엔진 파일들만 가져오기
+          mkdir -p temp_init
+          cd temp_init
+          flutter create --org com.pocket.money --project-name pocket_money_app base_app
+          cd ..
+          
+          # 2. 기존 android 폴더가 없으면 복사하되, 이미 우리가 만든 파일(res, kotlin, manifest)은 보존
+          cp -rn temp_init/base_app/android ./ 2>/dev/null || true
+          cp -r temp_init/base_app/android/gradle* android/ 2>/dev/null || true
+          cp -r temp_init/base_app/android/build.gradle* android/ 2>/dev/null || true
+          cp -r temp_init/base_app/android/app/build.gradle* android/app/ 2>/dev/null || true
+          rm -rf temp_init
 
-          # 2. 앱 표시 이름을 '얼마남았지?'로 지정
-          sed -i 's/android:label="pocket_money_app"/android:label="얼마남았지?"/g' android/app/src/main/AndroidManifest.xml
+          # 3. MainActivity.kt 기본 파일 생성 (누락 방지)
+          MAIN_DIR="android/app/src/main/kotlin/com/pocket/money/pocket_money_app"
+          mkdir -p $MAIN_DIR
+          cat << 'EOF' > $MAIN_DIR/MainActivity.kt
+          package com.pocket.money.pocket_money_app
 
-      - name: 의존성 설치
+          import io.flutter.embedding.android.FlutterActivity
+
+          class MainActivity: FlutterActivity() {
+          }
+          EOF
+
+      - name: 앱 패키지 설치
         run: flutter pub get
 
       - name: Android APK 빌드
