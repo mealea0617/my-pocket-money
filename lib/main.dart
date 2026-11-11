@@ -22,25 +22,38 @@ class MoneyTrackerPage extends StatefulWidget {
 }
 
 class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
-  int balance = 300000;
+  int totalBudget = 300000; // 이번 달 받은 총 용돈
   final TextEditingController titleController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
   final TextEditingController memoController = TextEditingController();
   final history = [];
 
+  // 총 쓴 돈 계산
+  int get totalSpent {
+    int sum = 0;
+    for (var item in history) {
+      sum += (item['amount'] as int);
+    }
+    return sum;
+  }
+
+  // 남은 용돈 계산
+  int get remainingBalance => totalBudget - totalSpent;
+
+  // 1. 받은 용돈(예산) 설정/수정 팝업창
   void showSetBalanceDialog() {
-    final setBalanceController = TextEditingController(text: balance.toString());
+    final setBudgetController = TextEditingController(text: totalBudget.toString());
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('용돈 설정'),
+          title: const Text('받은 용돈 설정'),
           content: TextField(
-            controller: setBalanceController,
+            controller: setBudgetController,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: '새로운 용돈 금액 (원)',
+              labelText: '이번 달 받은 총 용돈 (원)',
               border: OutlineInputBorder(),
             ),
           ),
@@ -51,10 +64,10 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                final newBudget = int.tryParse(setBalanceController.text.trim());
+                final newBudget = int.tryParse(setBudgetController.text.trim());
                 if (newBudget != null && newBudget >= 0) {
                   setState(() {
-                    balance = newBudget;
+                    totalBudget = newBudget;
                   });
                   Navigator.pop(context);
                 }
@@ -71,6 +84,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     );
   }
 
+  // 2. 지출 추가
   void addExpense() {
     final String title = titleController.text.trim();
     final int? amount = int.tryParse(amountController.text.trim());
@@ -86,7 +100,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
     setState(() {
-      balance -= amount;
       history.insert(0, {
         'title': title,
         'amount': amount,
@@ -101,13 +114,14 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     FocusScope.of(context).unfocus();
   }
 
+  // 3. 지출 삭제
   void deleteExpense(int index) {
     setState(() {
-      balance += (history[index]['amount'] as int);
       history.removeAt(index);
     });
   }
 
+  // 4. 지출 내역 수정
   void showEditDialog(int index) {
     final item = history[index];
     final editTitle = TextEditingController(text: item['title']);
@@ -125,7 +139,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               children: [
                 TextField(
                   controller: editTitle,
-                  decoration: const InputDecoration(labelText: '사용처'),
+                  decoration: const InputDecoration(labelText: '사용내역'),
                 ),
                 TextField(
                   controller: editAmount,
@@ -152,7 +166,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
 
                 if (newTitle.isNotEmpty && newAmount != null && newAmount > 0) {
                   setState(() {
-                    balance = balance + (item['amount'] as int) - newAmount;
                     item['title'] = newTitle;
                     item['amount'] = newAmount;
                     item['memo'] = newMemo;
@@ -172,8 +185,20 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     );
   }
 
+  String formatCurrency(int amount) {
+    return amount.toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 사용 비율 (0.0 ~ 1.0)
+    double progress = totalBudget > 0 ? (totalSpent / totalBudget) : 0.0;
+    if (progress > 1.0) progress = 1.0;
+    final double percent = totalBudget > 0 ? ((totalSpent / totalBudget) * 100) : 0.0;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('초간단 용돈기록장'),
@@ -184,38 +209,107 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // [2번+3번 결합] 프리미엄 대시보드 카드
             Card(
               color: Colors.teal.shade50,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                padding: const EdgeInsets.all(18.0),
                 child: Column(
                   children: [
+                    // 상단: 남은 용돈 강조 + 수정 아이콘
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('남은 용돈', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                        const Text('남은 용돈', style: TextStyle(fontSize: 15, color: Colors.grey)),
                         const SizedBox(width: 4),
                         IconButton(
                           icon: const Icon(Icons.edit, size: 16, color: Colors.grey),
                           onPressed: showSetBalanceDialog,
-                          tooltip: '용돈 금액 설정',
+                          tooltip: '총 예산 설정',
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
-                      '${balance.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}원',
-                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.teal),
+                      '${formatCurrency(remainingBalance)}원',
+                      style: const TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 중단: 게이지 바 & 사용률 퍼센트
+                    Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 8,
+                            backgroundColor: Colors.teal.shade100,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              progress >= 0.9 ? Colors.redAccent : Colors.teal,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '${percent.toStringAsFixed(1)}% 사용',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: progress >= 0.9 ? Colors.redAccent : Colors.teal.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFD4ECE7)),
+                    const SizedBox(height: 12),
+
+                    // 하단: 받은 용돈 vs 쓴 돈
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(
+                          children: [
+                            const Text('받은 용돈', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${formatCurrency(totalBudget)}원',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        Container(height: 24, width: 1, color: Colors.grey.shade300),
+                        Column(
+                          children: [
+                            const Text('쓴 돈', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${formatCurrency(totalSpent)}원',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 12),
+
+            // 사용내역 & 금액 입력창
             Row(
               children: [
                 Expanded(
@@ -245,6 +339,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 8),
+
+            // 감정/장소 메모 & 지출 버튼
             Row(
               children: [
                 Expanded(
@@ -270,6 +366,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // 최근 지출 목록
             const Align(
               alignment: Alignment.centerLeft,
               child: Text('최근 지출 내역', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -311,8 +409,12 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '-${item['amount'].toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}원',
-                                    style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15),
+                                    '-${formatCurrency(item['amount'] as int)}원',
+                                    style: const TextStyle(
+                                      color: Colors.redAccent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
