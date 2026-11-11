@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 
-void main() => runApp(const PocketMoneyApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  HomeWidget.setAppGroupId('group.pocket_money_app');
+  runApp(const PocketMoneyApp());
+}
 
 class PocketMoneyApp extends StatelessWidget {
   const PocketMoneyApp({super.key});
@@ -22,13 +27,18 @@ class MoneyTrackerPage extends StatefulWidget {
 }
 
 class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
-  int totalBudget = 300000; // 이번 달 받은 총 용돈
+  int totalBudget = 300000;
   final TextEditingController titleController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
   final TextEditingController memoController = TextEditingController();
   final history = [];
 
-  // 총 쓴 돈 계산
+  @override
+  void initState() {
+    super.initState();
+    updateAppWidget();
+  }
+
   int get totalSpent {
     int sum = 0;
     for (var item in history) {
@@ -37,10 +47,24 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     return sum;
   }
 
-  // 남은 용돈 계산
   int get remainingBalance => totalBudget - totalSpent;
 
-  // 1. 받은 용돈(예산) 설정/수정 팝업창
+  String formatCurrency(int amount) {
+    return amount.toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
+        );
+  }
+
+  // 홈 화면 위젯에 최신 잔액 전달
+  void updateAppWidget() {
+    HomeWidget.saveWidgetData<String>('balance_text', '${formatCurrency(remainingBalance)}원');
+    HomeWidget.updateWidget(
+      name: 'PocketWidgetProvider',
+      androidName: 'PocketWidgetProvider',
+    );
+  }
+
   void showSetBalanceDialog() {
     final setBudgetController = TextEditingController(text: totalBudget.toString());
 
@@ -69,6 +93,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                   setState(() {
                     totalBudget = newBudget;
                   });
+                  updateAppWidget();
                   Navigator.pop(context);
                 }
               },
@@ -84,7 +109,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     );
   }
 
-  // 2. 지출 추가
   void addExpense() {
     final String title = titleController.text.trim();
     final int? amount = int.tryParse(amountController.text.trim());
@@ -108,20 +132,20 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
       });
     });
 
+    updateAppWidget();
     titleController.clear();
     amountController.clear();
     memoController.clear();
     FocusScope.of(context).unfocus();
   }
 
-  // 3. 지출 삭제
   void deleteExpense(int index) {
     setState(() {
       history.removeAt(index);
     });
+    updateAppWidget();
   }
 
-  // 4. 지출 내역 수정
   void showEditDialog(int index) {
     final item = history[index];
     final editTitle = TextEditingController(text: item['title']);
@@ -170,6 +194,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                     item['amount'] = newAmount;
                     item['memo'] = newMemo;
                   });
+                  updateAppWidget();
                   Navigator.pop(context);
                 }
               },
@@ -185,16 +210,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     );
   }
 
-  String formatCurrency(int amount) {
-    return amount.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (m) => '${m[1]},',
-        );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // 사용 비율 (0.0 ~ 1.0)
     double progress = totalBudget > 0 ? (totalSpent / totalBudget) : 0.0;
     if (progress > 1.0) progress = 1.0;
     final double percent = totalBudget > 0 ? ((totalSpent / totalBudget) * 100) : 0.0;
@@ -209,7 +226,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // [2번+3번 결합] 프리미엄 대시보드 카드
             Card(
               color: Colors.teal.shade50,
               elevation: 0,
@@ -218,7 +234,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                 padding: const EdgeInsets.all(18.0),
                 child: Column(
                   children: [
-                    // 상단: 남은 용돈 강조 + 수정 아이콘
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -243,8 +258,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // 중단: 게이지 바 & 사용률 퍼센트
                     Column(
                       children: [
                         ClipRRect(
@@ -275,8 +288,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                     const SizedBox(height: 10),
                     const Divider(height: 1, thickness: 1, color: Color(0xFFD4ECE7)),
                     const SizedBox(height: 12),
-
-                    // 하단: 받은 용돈 vs 쓴 돈
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -308,8 +319,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // 사용내역 & 금액 입력창
             Row(
               children: [
                 Expanded(
@@ -339,8 +348,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 8),
-
-            // 감정/장소 메모 & 지출 버튼
             Row(
               children: [
                 Expanded(
@@ -366,8 +373,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // 최근 지출 목록
             const Align(
               alignment: Alignment.centerLeft,
               child: Text('최근 지출 내역', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
