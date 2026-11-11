@@ -1,19 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() async {
-  // 플러터 엔진 바인딩 보장
+void main() {
+  // 플러터 렌더링 엔진 안정적 시작
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 네이티브 플러그인 에러 방어
-  try {
-    await HomeWidget.setAppGroupId('group.pocket_money_app');
-  } catch (e) {
-    debugPrint('HomeWidget init error: $e');
-  }
-
   runApp(const PocketMoneyApp());
 }
 
@@ -56,7 +47,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     loadSavedData();
   }
 
-  // 1. 스마트폰 내부 저장소 불러오기
+  // 1. 스마트폰 내부 저장소에서 기록 불러오기
   Future<void> loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -82,21 +73,19 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
       }
       setState(() {});
     } catch (e) {
-      debugPrint('Load data error: $e');
+      debugPrint('Load error: $e');
     }
-    updateAppWidget();
   }
 
-  // 2. 스마트폰 내부 저장소에 영구 저장
+  // 2. 스마트폰 내부 저장소에 영구 저장하기
   Future<void> persistData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('saved_budgets', jsonEncode(monthlyBudgets));
       await prefs.setString('saved_history', jsonEncode(history));
     } catch (e) {
-      debugPrint('Save data error: $e');
+      debugPrint('Save error: $e');
     }
-    updateAppWidget();
   }
 
   String get currentMonthKey =>
@@ -124,30 +113,16 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         );
   }
 
-  void updateAppWidget() {
-    try {
-      HomeWidget.saveWidgetData<String>('balance_text', '${formatCurrency(currentRemaining)}원');
-      HomeWidget.updateWidget(
-        name: 'PocketWidgetProvider',
-        androidName: 'PocketWidgetProvider',
-      );
-    } catch (e) {
-      debugPrint('Widget update error: $e');
-    }
-  }
-
   void prevMonth() {
     setState(() {
       currentMonth = DateTime(currentMonth.year, currentMonth.month - 1, 1);
     });
-    updateAppWidget();
   }
 
   void nextMonth() {
     setState(() {
       currentMonth = DateTime(currentMonth.year, currentMonth.month + 1, 1);
     });
-    updateAppWidget();
   }
 
   void showSetBalanceDialog() {
@@ -311,6 +286,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Column(
           children: [
+            // [상단 1: 월 이동 헤더]
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -330,6 +306,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                 ),
               ],
             ),
+
+            // [상단 2: 2번+3번 합체 대시보드 카드]
             Card(
               color: Colors.teal.shade50,
               elevation: 0,
@@ -423,6 +401,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 10),
+
+            // [입력창: 내역 / 금액]
             Row(
               children: [
                 Expanded(
@@ -452,6 +432,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 8),
+
+            // [입력창: 메모 / 지출 버튼]
             Row(
               children: [
                 Expanded(
@@ -477,6 +459,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 12),
+
+            // [지출 목록 헤더]
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -485,6 +469,8 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 6),
+
+            // [지출 목록]
             Expanded(
               child: filteredList.isEmpty
                   ? Center(
