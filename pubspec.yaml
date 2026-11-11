@@ -1,5 +1,5 @@
 name: pocket_money_app
-description: "A minimal pocket money tracker app"
+description: "A minimal pocket money tracker app with widget"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  home_widget: ^0.7.0
 
 flutter:
   uses-material-design: true
