@@ -33,7 +33,7 @@ jobs:
         run: flutter pub get
 
       - name: Android APK 빌드
-        run: flutter build apk --split-per-abi=false
+        run: flutter build apk
 
       - name: APK 파일 업로드
         uses: actions/upload-artifact@v4
