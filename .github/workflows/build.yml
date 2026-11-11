@@ -20,20 +20,21 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: 안드로이드 기본 뼈대 생성
+      - name: 깨끗한 안드로이드 프로젝트 뼈대 생성
         run: |
-          mkdir -p temp_project
-          cd temp_project
-          flutter create --org com.pocket.money --project-name pocket_money_app myapp
-          cd ..
-          cp -r temp_project/myapp/android ./
-          rm -rf temp_project
+          # 1. 새 플러터 프로젝트를 만들어 순정 안드로이드 폴더 추출
+          flutter create --org com.pocket.money --project-name pocket_money_app fresh_app
+          cp -r fresh_app/android ./
+          rm -rf fresh_app
 
-      - name: 앱 패키지 설치
+          # 2. 앱 표시 이름을 '얼마남았지?'로 지정
+          sed -i 's/android:label="pocket_money_app"/android:label="얼마남았지?"/g' android/app/src/main/AndroidManifest.xml
+
+      - name: 의존성 설치
         run: flutter pub get
 
       - name: Android APK 빌드
-        run: flutter build apk
+        run: flutter build apk --release
 
       - name: APK 파일 업로드
         uses: actions/upload-artifact@v4
