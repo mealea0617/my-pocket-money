@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  HomeWidget.setAppGroupId('group.pocket_money_app');
+  try {
+    await HomeWidget.setAppGroupId('group.pocket_money_app');
+  } catch (e) {
+    debugPrint('HomeWidget Init Error: $e');
+  }
   runApp(const PocketMoneyApp());
 }
 
@@ -18,7 +22,7 @@ class PocketMoneyApp extends StatelessWidget {
       title: '얼마남았지?',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.teal,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
       home: const MoneyTrackerPage(),
@@ -48,7 +52,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     loadSavedData();
   }
 
-  // 1. 스마트폰 내부 저장소에서 데이터 불러오기
   Future<void> loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -78,7 +81,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     updateAppWidget();
   }
 
-  // 2. 스마트폰 내부 저장소에 데이터 영구 저장하기
   Future<void> persistData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('saved_budgets', jsonEncode(monthlyBudgets));
@@ -112,11 +114,15 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
   }
 
   void updateAppWidget() {
-    HomeWidget.saveWidgetData<String>('balance_text', '${formatCurrency(currentRemaining)}원');
-    HomeWidget.updateWidget(
-      name: 'PocketWidgetProvider',
-      androidName: 'PocketWidgetProvider',
-    );
+    try {
+      HomeWidget.saveWidgetData<String>('balance_text', '${formatCurrency(currentRemaining)}원');
+      HomeWidget.updateWidget(
+        name: 'PocketWidgetProvider',
+        androidName: 'PocketWidgetProvider',
+      );
+    } catch (e) {
+      debugPrint('Widget Update Error: $e');
+    }
   }
 
   void prevMonth() {
@@ -294,7 +300,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Column(
           children: [
-            // 월 이동 헤더
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -314,8 +319,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
                 ),
               ],
             ),
-
-            // 상단 대시보드 카드
             Card(
               color: Colors.teal.shade50,
               elevation: 0,
@@ -409,8 +412,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // 사용내역 & 금액 입력창
             Row(
               children: [
                 Expanded(
@@ -440,8 +441,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 8),
-
-            // 메모 & 등록 버튼
             Row(
               children: [
                 Expanded(
@@ -467,8 +466,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ],
             ),
             const SizedBox(height: 12),
-
-            // 월별 내역 리스트 헤더
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -477,8 +474,6 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
               ),
             ),
             const SizedBox(height: 6),
-
-            // 지출 리스트
             Expanded(
               child: filteredList.isEmpty
                   ? Center(
