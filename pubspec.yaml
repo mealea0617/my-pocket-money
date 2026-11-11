@@ -1,5 +1,5 @@
 name: pocket_money_app
-description: "A minimal pocket money tracker app with widget"
+description: "얼마남았지? - 미니멀 용돈 관리 앱"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   home_widget: ^0.7.0
+  shared_preferences: ^2.2.2
 
 flutter:
   uses-material-design: true
