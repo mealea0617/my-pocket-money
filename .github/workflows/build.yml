@@ -20,102 +20,14 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: 프로젝트 기본 구조 생성
+      - name: 안드로이드 기본 뼈대 생성
         run: |
           mkdir -p temp_project
           cd temp_project
-          flutter create --org com.pocket.money app
+          flutter create --org com.pocket.money --project-name pocket_money_app myapp
           cd ..
-          cp -r temp_project/app/android ./
+          cp -r temp_project/myapp/android ./
           rm -rf temp_project
-
-      - name: 앱 이름 및 위젯 레이아웃 자동 설정
-        run: |
-          # 1. 안드로이드 앱 이름을 '얼마남았지?'로 변경
-          sed -i 's/android:label="app"/android:label="얼마남았지?"/g' android/app/src/main/AndroidManifest.xml
-
-          # 2. 위젯 레이아웃 XML 생성
-          mkdir -p android/app/src/main/res/layout
-          cat << 'EOF' > android/app/src/main/res/layout/pocket_widget_layout.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:background="#00796B"
-              android:gravity="center"
-              android:padding="12dp">
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="얼마남았지?"
-                  android:textColor="#B2DFDB"
-                  android:textSize="13sp" />
-              <TextView
-                  android:id="@+id/balance_text"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="300,000원"
-                  android:textColor="#FFFFFF"
-                  android:textSize="22sp"
-                  android:textStyle="bold"
-                  android:layout_marginTop="4dp" />
-          </LinearLayout>
-          EOF
-
-          # 3. 위젯 메타데이터 XML 생성
-          mkdir -p android/app/src/main/res/xml
-          cat << 'EOF' > android/app/src/main/res/xml/pocket_widget_info.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-              android:minWidth="140dp"
-              android:minHeight="70dp"
-              android:updatePeriodMillis="1800000"
-              android:initialLayout="@layout/pocket_widget_layout"
-              android:resizeMode="horizontal|vertical"
-              android:widgetCategory="home_screen">
-          </appwidget-provider>
-          EOF
-
-          # 4. 위젯 Kotlin 프로바이더 코드 생성
-          PACKAGE_DIR="android/app/src/main/kotlin/com/pocket/money/app"
-          mkdir -p $PACKAGE_DIR
-          cat << 'EOF' > $PACKAGE_DIR/PocketWidgetProvider.kt
-          package com.pocket.money.app
-
-          import android.appwidget.AppWidgetManager
-          import android.content.Context
-          import android.content.SharedPreferences
-          import android.widget.RemoteViews
-          import es.antonborri.home_widget.HomeWidgetProvider
-
-          class PocketWidgetProvider : HomeWidgetProvider() {
-              override fun onUpdate(
-                  context: Context,
-                  appWidgetManager: AppWidgetManager,
-                  appWidgetIds: IntArray,
-                  widgetData: SharedPreferences
-              ) {
-                  for (appWidgetId in appWidgetIds) {
-                      val views = RemoteViews(context.packageName, R.layout.pocket_widget_layout)
-                      val balance = widgetData.getString("balance_text", "300,000원")
-                      views.setTextViewText(R.id.balance_text, balance)
-                      appWidgetManager.updateAppWidget(appWidgetId, views)
-                  }
-              }
-          }
-          EOF
-
-          # 5. AndroidManifest.xml에 위젯 리시버 등록
-          sed -i '/<\/application>/i \
-                  <receiver android:name=".PocketWidgetProvider" android:exported="true">\
-                      <intent-filter>\
-                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />\
-                      </intent-filter>\
-                      <meta-data\
-                          android:name="android.appwidget.provider"\
-                          android:resource="@xml/pocket_widget_info" />\
-                  </receiver>' android/app/src/main/AndroidManifest.xml
 
       - name: 앱 패키지 설치
         run: flutter pub get
