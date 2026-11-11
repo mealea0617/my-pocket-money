@@ -4,12 +4,16 @@ import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
+  // 플러터 엔진 바인딩 보장
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 네이티브 플러그인 에러 방어
   try {
     await HomeWidget.setAppGroupId('group.pocket_money_app');
   } catch (e) {
-    debugPrint('HomeWidget Init Error: $e');
+    debugPrint('HomeWidget init error: $e');
   }
+
   runApp(const PocketMoneyApp());
 }
 
@@ -52,39 +56,46 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
     loadSavedData();
   }
 
+  // 1. 스마트폰 내부 저장소 불러오기
   Future<void> loadSavedData() async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-    final savedBudgets = prefs.getString('saved_budgets');
-    if (savedBudgets != null) {
-      try {
-        final decoded = jsonDecode(savedBudgets) as Map;
-        monthlyBudgets.clear();
-        decoded.forEach((k, v) {
-          monthlyBudgets[k.toString()] = v as int;
-        });
-      } catch (_) {}
-    }
+      final savedBudgets = prefs.getString('saved_budgets');
+      if (savedBudgets != null) {
+        final decoded = jsonDecode(savedBudgets);
+        if (decoded is Map) {
+          monthlyBudgets.clear();
+          decoded.forEach((k, v) {
+            monthlyBudgets[k.toString()] = v as int;
+          });
+        }
+      }
 
-    final savedHistory = prefs.getString('saved_history');
-    if (savedHistory != null) {
-      try {
+      final savedHistory = prefs.getString('saved_history');
+      if (savedHistory != null) {
         final decoded = jsonDecode(savedHistory);
         if (decoded is List) {
           history.clear();
           history.addAll(decoded);
         }
-      } catch (_) {}
+      }
+      setState(() {});
+    } catch (e) {
+      debugPrint('Load data error: $e');
     }
-
-    setState(() {});
     updateAppWidget();
   }
 
+  // 2. 스마트폰 내부 저장소에 영구 저장
   Future<void> persistData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('saved_budgets', jsonEncode(monthlyBudgets));
-    await prefs.setString('saved_history', jsonEncode(history));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_budgets', jsonEncode(monthlyBudgets));
+      await prefs.setString('saved_history', jsonEncode(history));
+    } catch (e) {
+      debugPrint('Save data error: $e');
+    }
     updateAppWidget();
   }
 
@@ -121,7 +132,7 @@ class _MoneyTrackerPageState extends State<MoneyTrackerPage> {
         androidName: 'PocketWidgetProvider',
       );
     } catch (e) {
-      debugPrint('Widget Update Error: $e');
+      debugPrint('Widget update error: $e');
     }
   }
 
